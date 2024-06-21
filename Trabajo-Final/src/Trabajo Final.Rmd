@@ -25,6 +25,8 @@ knitr::opts_chunk$set(echo = TRUE)
 
 Este análisis forma parte de la evaluación final del módulo Ciencia de Datos I. La idea es llevar adelante un análisis exploratorio acerca de usuarios de Ecobici durante el año **2024**. Los datos se encuentran disponibles en el [sitio](https://data.buenosaires.gob.ar/dataset/bicicletas-publicas).
 
+(**Nota:** Este trabajo se encuentra publicado en mi [blog](https://rpubs.com/GuilleFerchero/Ecobici_Parte_I) y en mi [sitio de GitHub](https://github.com/GuilleFerchero/Big-data-e-Inteligencia-territorial--FLACSO-/tree/main/Trabajo-Final))
+
 
 
 <div>
@@ -82,7 +84,7 @@ hasta <- max(df$fecha_alta)  #generamos objetos para texto y grafico
 ```
 
 ::: {align="justify"}
-A partir de los análisis iniciales se observa que la base contiene `r usuarios` registrados desde `r desde` hasta `r hasta`. El paso siguiente consiste en limpiar las variables que vamos a necesitar para generar las visualizaciones. Tambien mediante summary vemos que en el campo edad_usuario hay 3 valores faltantes y al menos un caso con valores ilógicos
+A partir de los análisis iniciales se observa que la base contiene `r usuarios` usuarios registrados desde `r desde` hasta `r hasta`. El paso siguiente consiste en limpiar las variables que vamos a necesitar para generar las visualizaciones. Tambien mediante summary vemos que en el campo edad_usuario hay 3 valores faltantes y al menos un caso con valores ilógicos
 :::
 
 ```{r message=FALSE, warning=FALSE}
