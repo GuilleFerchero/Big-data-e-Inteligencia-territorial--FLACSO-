@@ -1,0 +1,440 @@
+---
+title: "Trabajo Final"
+author: "Juan Guillermo Ferchero"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    code_folding: hide
+    df_print: paged
+    toc: yes
+  pdf_document:
+    toc: yes
+  html_notebook:
+    depth: 4
+    toc: yes
+    toc_float: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Trabajo Final Ciencia de Datos I
+
+### Introducción
+
+Este análisis forma parte de la evaluación final del módulo Ciencia de Datos I. La idea es llevar adelante un análisis exploratorio acerca de usuarios de Ecobici durante el año **2023**. Los datos se encuentran disponibles en el [sitio](https://data.buenosaires.gob.ar/dataset/bicicletas-publicas).
+
+(**Nota:** Este trabajo se encuentra publicado en mi [blog](https://rpubs.com/GuilleFerchero/Ecobici_Parte_I) y en mi [sitio de GitHub](https://github.com/GuilleFerchero/Big-data-e-Inteligencia-territorial--FLACSO-/tree/main/Trabajo-Final))
+
+
+
+<div>
+
+<p style="text-align:center;">
+
+![](images/ecobici.jpg){width="300px" height="200px"}
+
+</div>
+
+</p>
+
+### Ideas
+
+-   Generar visualizaciones que permitan entender las características sociodemográficas (en este caso edad) del universo de usuarios
+
+-   Análizar las altas según las fechas o momentos del dia.
+
+::: {align="justify"}
+El primer paso es limpiar ambiente, cargar datos y librerías y generar summary y glimpse para tener una primera aproximación a nuestros datos.
+:::
+
+```{r carga, message=FALSE, warning=FALSE}
+
+#Limpiamos ambiente
+
+rm(list = ls())
+
+#Cargamos librerías y datos
+
+library(tidyverse)
+library(DT)
+library(scales)
+
+#Descarga de datos 
+
+#con internet
+
+link <- "https://cdn.buenosaires.gob.ar/datosabiertos/datasets/transporte-y-obras-publicas/bicicletas-publicas/usuarios_ecobici_2023.csv"
+
+df <- read_csv(link)
+
+#sin internet
+
+#df <- read.csv("../data/usuarios_ecobici_2024.csv")
+
+
+summary(df) #hacemos una primera vista de la información
+glimpse(df)
+usuarios <- nrow(unique(df)) #generamos objetos para texto y grafico
+desde <- min(df$fecha_alta)  #generamos objetos para texto y grafico
+hasta <- max(df$fecha_alta)  #generamos objetos para texto y grafico
+
+
+```
+
+::: {align="justify"}
+A partir de los análisis iniciales se observa que la base contiene `r usuarios` usuarios registrados desde `r desde` hasta `r hasta`. El paso siguiente consiste en limpiar las variables que vamos a necesitar para generar las visualizaciones. Tambien mediante summary vemos que en el campo edad_usuario hay 3 valores faltantes y al menos un caso con valores ilógicos
+:::
+
+```{r message=FALSE, warning=FALSE}
+table(df$edad_usuario)
+```
+
+::: {align="justify"}
+Para un futuro análisis podria chequearse aquellos usuarios con edades mayores a 90 en la base de recorridos para si tienen actividad, por lo pronto vamos a quitar aquellos casos mayores a 97 y menores a 0. El paso siguiente consiste en proceder a la limpieza de los datos para generar las recodificaciones necesarias. Se observa que el campo género_usuario contiene categorías en ingles, con lo cual procedemos a cambiarlas para que estén en nuestro idioma. Tambien se recodifican hora y edad usuario para obtener categorías más útiles para gráficos y tablas.
+:::
+
+```{r limpieza, message=FALSE, warning=FALSE}
+
+df <- df %>% 
+  filter(edad_usuario < 98 & edad_usuario > 0) %>%
+  mutate("Genero" = case_when( genero_usuario == "MALE" ~ "Masculino",
+                               genero_usuario == "FEMALE" ~ "Femenino",
+                               TRUE ~ "Otro"), #recod género
+         "Mes" = month(fecha_alta, label = TRUE), #extraigo mes
+         "Hora" = hour(hora_alta),
+         "HoraRec" = case_when(Hora >= 0 & Hora < 6 ~ "Madrugada", 
+                               Hora >= 6 & Hora < 12 ~ "Mañana",
+                               Hora >= 12 & Hora < 18 ~ "Tarde",
+                               TRUE ~ "Noche" ),
+         "Dia" = wday(fecha_alta,label = TRUE, abbr = FALSE),#agrego etiqueta para dias
+         "EdadRec" = case_when(edad_usuario >= 0 & edad_usuario < 15 ~ "1. Menores de 15",
+                               edad_usuario >= 15 & edad_usuario < 20 ~ "2. de 15 hasta 20",
+                            edad_usuario >= 20 & edad_usuario < 25 ~ "3. de 20 hasta 25",
+                            edad_usuario >= 25 & edad_usuario < 30 ~ "4. de 25 hasta 30",
+                            edad_usuario >= 30 & edad_usuario < 35 ~ "5. de 30 hasta 35",
+                            edad_usuario >= 35 & edad_usuario < 40 ~ "6. de 35 hasta 40",
+                            edad_usuario >= 40 & edad_usuario < 45 ~ "7. de 40 hasta 45",
+                            edad_usuario >= 45 & edad_usuario < 50 ~ "8. de 45 hasta 50",
+                            edad_usuario >= 50 & edad_usuario < 55 ~ "9. de 50 hasta 55",
+                            TRUE ~ "Mayores de 55"))#recod edad
+
+
+mujeres <- df %>% 
+  filter(Genero == "Femenino") %>% 
+  nrow()
+
+varones <- df %>% 
+  filter(Genero == "Masculino") %>% 
+  nrow()
+
+otro <- df %>% 
+  filter(Genero == "Otro") %>% 
+  nrow()
+
+
+```
+
+### Visualizaciones
+
+```{r grafico1, message=FALSE, warning=FALSE}
+
+ggplot(df, aes(x = edad_usuario))+
+  geom_histogram(bins = 50, fill ="#d1e5f0")+
+  labs(title = paste0("Distribución de altas ECOBICI ",desde," - ",hasta),
+       subtitle = "Cantidad de casos según edad",
+       caption = "Datos Abiertos CABA",
+       y = "Casos",
+       x = "Edad")+
+  scale_y_continuous(labels = comma)+
+  theme_minimal()+
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5),
+        text = element_text(family = "Verdana"))
+
+
+```
+
+<br>
+
+Un primer histograma ya con el campo edad "limpio" muestra algunas características de la distribución. Veamos ahora cuantos casos tenemos por género y edad.
+
+</br>
+
+```{r tabla1, message=FALSE, warning=FALSE}
+# recursos: 
+# https://rpubs.com/xlisouski/Tuneando_Tablas_DT
+# https://help.displayr.com/hc/en-us/articles/360003127476-How-to-Create-Customized-Tables-Using-the-DT-R-Package#
+# https://stackoverflow.com/questions/43739218/r-datatable-formatting-with-javascript
+
+Tabla1 <- df %>%
+  group_by(EdadRec) %>%
+  summarise(Casos = n()) %>%
+  mutate(Porcentaje = round(Casos/sum(Casos),4)) %>%
+  mutate(Etiqueta_Porcentaje = paste0(Casos," ( % ", Porcentaje*100, ")")) %>% 
+  rename(Edad = EdadRec)
+
+
+Tabla1 %>%
+  select(!c(Etiqueta_Porcentaje)) %>% 
+  datatable(rownames = FALSE,caption = 'Tabla 1: Altas por rango de edad.',
+          options = list(paging=FALSE,
+                         searching=FALSE,
+                         initComplete = JS(
+                         "function(settings, json) {",
+                         "$(this.api().table().header()).css({'background-color': '#2c698d', 'color': '#fff','font-family': 'Verdana'});
+                          $(this.api().table().body()).css({'background-color': 'white', 'color': 'black','font-family': 'Verdana'});
+                           }"))) %>% 
+  formatRound(c("Casos"),0) %>% 
+  formatPercentage(c("Porcentaje"),2) %>% 
+  formatStyle("Porcentaje", background = styleColorBar(c(0,max(Tabla1$Porcentaje)), '#e3f6f5'),
+              backgroundSize = '100% 100%', 
+              backgroundRepeat = 'no-repeat')%>%
+  formatStyle(columns = c(3),width = '300px')
+
+
+
+```
+
+```{r grafico1a, message=FALSE, warning=FALSE}
+
+Tabla1a <- df %>%
+  group_by(Genero) %>% 
+  summarise(total = n()) %>%
+  mutate(porcentaje = round(total/sum(total)*100,2)) %>% 
+  mutate(etiqueta = paste0(total," ( % ", porcentaje, ")"))
+
+ggplot(Tabla1a,aes(x="",y=total, fill=Genero))+
+  geom_bar(stat = "identity",color="white",width = 1)+
+  scale_fill_manual(values = c("#fb7756","#1ac0c6","#facd60"))+
+  labs(title = paste0("Altas ECOBICI "),
+       subtitle = "Proporción según Sexo",
+       caption = "Datos Abiertos CABA",
+       y = "",
+       x = "")+
+  theme_minimal()+
+  scale_y_continuous(labels = comma)+
+  theme(plot.title = element_text( hjust = 0.5 , vjust = 0.5),
+        plot.subtitle = element_text( hjust = 0.5 , vjust = 0.5),
+        legend.position = "bottom",
+        legend.title = element_blank(),
+        text = element_text(family = "Verdana"))+
+  guides(fill = guide_legend(reverse = TRUE))+
+  coord_flip()+
+    geom_text(aes(label = etiqueta),
+            position=position_stack(vjust=0.5),
+            color = "white")
+
+```
+
+En esta figura puede verse que una mayor proporción de varones utiliza el servicio.
+
+```{r tabla2, message=FALSE, warning=FALSE}
+
+#Aca iria tabla de altas por mes y género
+
+Tabla2 <- df %>% 
+  group_by(Mes,Genero) %>% 
+  summarise(total = n()) %>% 
+  pivot_wider(names_from = Genero, values_from = total)
+
+Tabla2 %>%
+  datatable(rownames = FALSE,caption = paste0('Tabla 2: Altas según género y mes. ',desde," - ",hasta),
+          options = list(paging=FALSE,
+                         searching=FALSE,
+                         initComplete = JS(
+                         "function(settings, json) {",
+                         "$(this.api().table().header()).css({'background-color': '#2c698d', 'color': '#fff','font-family': 'Verdana'});
+                          $(this.api().table().body()).css({'background-color': 'white', 'color': 'black','font-family': 'Verdana'});
+                           }"))) 
+
+
+
+```
+
+<br>
+
+Podemos ver la misma info en formato gráfico, pero ahora visualizando lo ocurrido por dia.
+
+</br>
+
+```{r grafico2, message=FALSE, warning=FALSE}
+
+#Aca iria evolutivo de altas por mes coloreado por género
+Tabla2a <- df %>% 
+  group_by(fecha_alta,Genero) %>% 
+  summarise(total = n())
+
+
+
+ggplot(Tabla2a,aes(x = fecha_alta, y = total, color=Genero ))+
+  geom_line()+
+  geom_point()+
+  scale_color_manual(values =c("#fb7756","#1ac0c6","#facd60"))+
+  labs(title = paste0("Altas según fecha y género ",desde," - ",hasta),
+       caption = "Datos Abiertos CABA",
+       y = "Fecha",
+       x = "Casos")+
+  theme_minimal()+
+  theme(plot.title = element_text(hjust = 0.5, family  = "Verdana"),
+        plot.subtitle = element_text(hjust = 0.5),
+        text = element_text(family = "Verdana"),
+        legend.position = "bottom",
+        legend.title = element_blank())
+  
+  
+
+
+
+
+```
+
+Siguiendo esta lógica, tambien podemos ver la composición de casos mediante un gráfico de proporciones con la info de la tabla 1. Para un posterior análisis sería intersante plantear que ocurre en meses con climas menos favorables para la bicicleta, para ello puede ser util replicar este mismo análisis, pero utilzando datos de 2023 completo.
+
+Por lo pronto puede apreciarse un descenso de casos en abril tal cual se muestra en el grafico siguiente:
+
+```{r grafico3, message=FALSE, warning=FALSE}
+
+Tabla3 <- df %>%
+  group_by(Mes,Genero) %>% 
+  summarise(total = n()) %>%
+  mutate(porcentaje = round(total/sum(total)*100,2)) %>% 
+  mutate(etiqueta = paste0(total," ( % ", porcentaje, ")"))
+
+Tablaaux <- Tabla3 %>% 
+  select(Mes) %>% 
+  filter(!duplicated(Mes))
+
+#filas <- nrow(Tablaaux)
+
+filas <- 4
+
+ggplot(Tabla3,aes(x="",y=total, fill=Genero))+
+  geom_bar(stat = "identity",color="white",width = 1)+
+  scale_fill_manual(values = c("#fb7756","#1ac0c6","#facd60"))+
+  labs(title = paste0("Altas ECOBICI "),
+       subtitle = "Proporción según Sexo",
+       caption = "Datos Abiertos CABA",
+       y = "",
+       x = "")+
+  theme_minimal()+
+  theme(plot.title = element_text( hjust = 0.5 , vjust = 0.5),
+        plot.subtitle = element_text( hjust = 0.5 , vjust = 0.5),
+        legend.position = "bottom",
+        legend.title = element_blank(),
+        text = element_text(family = "Verdana"))+
+  guides(fill = guide_legend(reverse = TRUE))+
+  coord_flip()+
+  facet_wrap(~Mes, nrow = filas)#se wrapea por mes
+   
+
+#ggsave("/images/graf_anual_ecobici.png",width = 12)
+
+
+
+```
+
+A continuación veremos como se distribuye el género según la edad bajo la lógica de una piramide de edad
+
+```{r grafico4, message=FALSE, warning=FALSE}
+
+#Aca iria piramide de edad
+
+TotalCasos <- nrow(df) #se arma objeto con total
+
+Tabla4 <- df %>%
+  select(EdadRec, Genero) %>% 
+  group_by(EdadRec, Genero) %>% 
+  summarise(Casos = n()) %>% 
+  mutate(porc = Casos/TotalCasos*100) %>% #se divide sobre el total de los casos
+  mutate(porc2 =case_when(Genero == "Femenino" ~ porc,
+                             Genero == "Masculino"~ as.double(porc*(-1))))
+
+
+ggplot(Tabla4, aes(x= EdadRec,
+                   y=porc2,
+                   fill= Genero))+
+  geom_col(data = Tabla4 %>% 
+             filter(Genero == "Masculino"), width = 0.5 , fill = "#1ac0c6")+ #columnas hombres
+  geom_col(data = Tabla4 %>% 
+             filter(Genero == "Femenino"), width = 0.5 , fill = "#fb7756")+ #columnas mujeres
+     labs(title = paste0("Altas según edad "),
+       caption = "Datos Abiertos CABA",
+       y = "Hombres                                 Mujeres", #se agrega eje y separado para mostrar referencias
+       x = "Edad")+
+  coord_flip()+
+  theme_minimal()+
+  # scale_x_discrete(limit = c("Menores de 10","de 10 hasta 20","de 20 hasta 30","de 30 hasta 40","de 40 hasta 50"))+ #se reordena las categorias
+  # scale_y_continuous(breaks = c(-8,-4,0,4,8), #se especifican los cortes
+  #                    labels = c("8%","4%","0","4%","8%"))+ #se especifican los nombres de los cortes
+  theme(plot.title = element_text( hjust = 0.5 , vjust = 0.5),
+        plot.subtitle = element_text( hjust = 0.5 , vjust = 0.5),
+        text = element_text(family = "Verdana"))
+
+
+
+```
+
+<br>
+
+Puede apreciarse que el sector que mas altas realiza es el de 20 a 25 años, como ya vimos en la tabla 1.
+
+</br>
+
+```{r grafico6, message=FALSE, warning=FALSE}
+
+Tabla5 <- df %>%
+  group_by(HoraRec,Genero) %>% 
+  summarise(total = n()) %>%
+  mutate(porcentaje = round(total/sum(total)*100,2)) %>% 
+  mutate(etiqueta = paste0(total," ( % ", porcentaje, ")"))
+
+
+Tablaaux <- Tabla5 %>% 
+  select(HoraRec) %>% 
+  filter(!duplicated(HoraRec))
+
+filas <- nrow(Tablaaux)
+
+
+ggplot(Tabla5,aes(x="",y=total, fill=Genero))+
+  geom_bar(stat = "identity",color="white",width = 1)+
+  scale_fill_manual(values = c("#fb7756","#1ac0c6","#facd60"))+
+  labs(title = paste0("Altas ECOBICI "),
+       subtitle = "Proporción según Sexo y horario",
+       caption = "Datos Abiertos CABA",
+       y = "",
+       x = "")+
+  theme_minimal()+
+  scale_y_continuous(labels = comma)+
+  theme(plot.title = element_text( hjust = 0.5 , vjust = 0.5),
+        plot.subtitle = element_text( hjust = 0.5 , vjust = 0.5),
+        legend.position = "bottom",
+        legend.title = element_blank(),
+        text = element_text(family = "Verdana"))+
+  guides(fill = guide_legend(reverse = TRUE))+
+  coord_flip()+
+  facet_wrap(~HoraRec, nrow = filas)+
+    geom_text(aes(label = total),
+            position=position_stack(vjust=0.5),
+            color = "white")#se wrapea por periodo
+
+
+```
+
+Se aprecia que la tarde es el momento del día con mayor cantidad de altas.
+
+### Conclusión
+
+::: {align="justify"}
+A partir de este pequeño análisis, fue posible carcaterizar la población de usuarios del Programa Ecobici. Las visualizaciones y tablas construidas permitieron comprender mejor este universo a partir de las variables de las cuales se disponía y las herramientas que dispone R para llevar adelante esta tarea dejando ver el potencial para profundizar el análisis. Se pudo ver que el grueso de altas se produce durante la tarde y en la franja etaria 20 a 25 años. Tambien se observó que el volumen de altas decae en abril en relación a meses de mayor temperatura.
+:::
+
+### Ideas para futuros análisis
+
+::: {align="justify"}
+-   Utilizar bases de usuarios de años anteriores para construir evolutivos históricos (sobre todo el año 2020 y lo ocurrido con la pandemia)
+-   Conectar con bases de estaciones y recorridos para georreferenciar los usos del programa, ver recorridos por género, edad y momento del día. Tambien se puede obtener la cantidad de usos por usuario.
+-   Conectar con otros servicios o API de clima para evaluar influyen las condiciones climáticas en el uso del servicio
+:::
