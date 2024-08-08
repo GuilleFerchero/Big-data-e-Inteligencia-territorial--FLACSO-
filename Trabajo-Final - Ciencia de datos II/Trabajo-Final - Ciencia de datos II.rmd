@@ -6,7 +6,10 @@ output:
   html_document:
     code_folding: hide
     df_print: paged
-    toc: yes
+    toc: true
+    toc_float:
+      collapsed: true
+      smooth_scroll: true
   pdf_document:
     toc: yes
   html_notebook:
@@ -14,6 +17,13 @@ output:
     toc: yes
     toc_float: yes
 ---
+
+```{r}
+knitr::opts_chunk$set(fig.showtext=TRUE)
+
+```
+
+
 
 ## Trabajo Final Ciencia de Datos II
 
@@ -47,11 +57,11 @@ knitr::include_graphics("img/ecobici.jpg")
 
 -   
 
-    D)  Evaluar las tipologías que adquiere la movilidad urbana en el programa ECOBICI tomando en consideración el género y edad de usuarios, asi como tambien los destinos más comunes.
+    D)  Evaluar las tipologías que adquiere la movilidad urbana en el programa ECOBICI tomando en consideración el género y edad de usuarios.
 
 -   
 
-    E)  Indagar acerca de la influencia climática en la demanda del programa.
+    E)  Indagar acerca de la influencia climática en la demanda del programa. (????????????????)
 
 ### Fuentes
 
@@ -98,6 +108,12 @@ pacman::p_load("DT",
 
 ###################################################################################
 
+#fuentes
+
+font_add_google(family = "montserrat", "Montserrat")
+font_add_google(family = "Oswald", "Oswald")
+showtext_auto()
+
 ```
 
 #### Base Usuarios
@@ -142,7 +158,14 @@ get_usuarios <- function(añoini,añofin){
 }
 
 data_usuarios <- get_usuarios(2019,2023)
+
+usuarios <- nrow(data_usuarios)
+
 ```
+
+La base comprende la totalidad de altas registradas desde 2019 hasta 2023. Contiene `r usuarios` usuarios y se aplicó un proceso de limpieza y re codificación de variables para trabajar con la edad y limpiar las fechas.
+
+<br>
 
 #### Base Recorridos
 
@@ -201,8 +224,13 @@ fechalim2 <- as.Date("2023-07-08")
 dataday <- data_recorridos %>% 
   filter(Fecha_origen  > fechalim1 & Fecha_origen  < fechalim2)
 
+viajes <- nrow(data_recorridos)
+usu_reco <- length(unique(data_recorridos$id_usuario))
 
 ```
+
+Esta base será la de mayor relevancia para este proyecto. Contiene `r viajes` recorridos realizados por `r usu_reco` usuarios del Programa. Los datos nos permiten geolocalizar los viajes y conocer tanto su duración como el horario y el dia. 
+
 
 #### Base Estaciones
 
@@ -225,9 +253,13 @@ data_estaciones <- dataest %>%
                               COMUNA == "" ~ "Sin Informar"))
 
 rm(dataest)
-rm(estaciones)
+
+estaciones <- nrow(data_estaciones)
 
 ```
+
+La base estaciones contiene las estaciones actuales del programa ( `r estaciones`) junto con sus coordenadas correspondientes. 
+
 
 #### Clima
 
@@ -238,6 +270,8 @@ clima <- read.csv("data/clima_aeroparque_2023.csv", sep = ";")
 clima <- clima %>%  
   mutate(Fecha = dmy(Fecha))
 ```
+
+Finalmente, la base clima contiene las característica climáticas de todos los dias del año 2023. Esto nos permite, mediante uniones, visualizar el comportamiento de los recorridos en condiciones adversas. 
 
 #### Uniones
 
@@ -281,6 +315,9 @@ tabla_usuarios_info <- data_usuarios %>%
 
 data_recorridos <- left_join(data_recorridos,tabla_usuarios_info)
 
+
+rm(tabla_usuarios_info)
+
 #controlo cuantos quedan afuera
 
 # #casos_sin_na <- nrow(data_recorridos %>% 
@@ -312,19 +349,53 @@ data_recorridos<- left_join(data_recorridos,precip)
 
 Ya finalizado el proceso de limpieza y uniones, podemos proceder a explorar algunas de las características de los recorridos en 2023
 
-```{r graf1, message=FALSE, warning=FALSE}
-tabla_mensual_reco <- data_recorridos%>% 
-  group_by(Mes_origen,Genero,precip_rec) %>% 
-  summarise(total = n()) 
+```{r graf1, fig.align='center', message=FALSE, warning=FALSE, out.width="80%"}
 
-ggplot(tabla_mensual_reco, aes(x = Mes_origen, y = total, fill = Genero))+
-  geom_col(position =  "dodge")+
-  scale_x_continuous(breaks = c(seq(1,12, by = 1)))+
-  theme_minimal()
+ggplot(tabla_reco_day, aes(x = Día_label_origen, y = viajes))+
+  geom_col()
 
 ```
 
+```{r graf2, fig.align='center', message=FALSE, warning=FALSE, out.width="80%"}
 
+
+```
+
+```{r tablas aux}
+tabla_reco_day <- data_recorridos %>%
+  group_by(Día_label_origen) %>%
+  summarise(viajes = n())
+
+tabla_reco_month <- data_recorridos %>%
+  group_by(Mes_origen) %>%
+  summarise(viajes = n())
+
+Tabla_usuarios <- data_recorridos %>%
+  group_by(Mes_origen,id_usuario) %>%
+  summarise(viajes = n()) %>%
+  ungroup() %>%
+  group_by(Mes_origen) %>%
+  summarise(prom = mean(viajes))
+
+Tabla_usuarios_dur <- data_recorridos %>%
+  filter(Duración_real < 1000) %>%
+  group_by(Mes_origen,género,Día_label_origen) %>%
+  summarise(duración = mean(Duración_real),
+            cantidad = n())
+
+tabla_origen_destino <- data_recorridos %>%
+  group_by(nombre_estacion_origen,nombre_estacion_destino) %>%
+  summarise(total = n()) %>%
+  arrange(desc(total))
+ 
+tabla_origen_destino_paseo <- data_recorridos %>%
+  filter(nombre_estacion_origen == nombre_estacion_destino,
+         Día_label_origen == "lunes") %>%
+  group_by(nombre_estacion_origen,nombre_estacion_destino) %>%
+  summarise(total = n()) %>%
+  arrange(desc(total))
+
+```
 
 ANTIGUEDAD DE USUARIOS (VER SI HAGO GEOM COL O SECTORES)
 
@@ -338,13 +409,13 @@ MAPA ORIGEN VERDE DESTINO ROJO POR RANGO HORARIO (ANIMADO)
 
 MAPA ORIGEN EN VERDE Y DESTINO EN ROJO POR DIA HABIL VS FINDE LLUVIA VS NO LLUVIA
 
-PROMEDIO DE VIAJES DIARIOS POR MES 
+PROMEDIO DE VIAJES DIARIOS POR MES
 
 VIAJES SEGÚN CLIMA
 
 RECREACIÓN VS MOVILIDAD LABORAL
 
-######################
+###################### 
 
 OFERTA:
 
@@ -355,13 +426,3 @@ DENSIDAD DE ESTACIONES POR BARRIO
 DISTANCIA CON UNIVERSIDADES Y PARQUES (INFO DE OSM O DESCARGA DE DATA ABIERTA)
 
 ISOCRONAS DE ESTACIONES CON RESPECTO AL CENTRO
-
-
-
-
-
-
-
-
-
-
