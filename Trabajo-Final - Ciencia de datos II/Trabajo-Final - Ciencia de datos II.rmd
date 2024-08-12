@@ -350,9 +350,9 @@ data_recorridos<- left_join(data_recorridos,precip)
 Ya finalizado el proceso de limpieza y uniones, podemos proceder a explorar algunas de las características de los recorridos en 2023
 
 ```{r graf1, fig.align='center', message=FALSE, warning=FALSE, out.width="80%"}
-
-ggplot(tabla_reco_day, aes(x = Día_label_origen, y = viajes))+
-  geom_col()
+# 
+# ggplot(tabla_reco_day, aes(x = Día_label_origen, y = viajes))+
+#   geom_col()
 
 ```
 
@@ -396,33 +396,63 @@ tabla_origen_destino_paseo <- data_recorridos %>%
   arrange(desc(total))
 
 ```
+### Mapas
 
-ANTIGUEDAD DE USUARIOS (VER SI HAGO GEOM COL O SECTORES)
 
-GEOM_COL RECORRIDOS POR COMUNA / BARRIO (COMO ANTESALA DE MATRIZ ORIGEN DESTINO Y MAPA)
+#### limpieza de recorrido diario
 
-MATRIZ ORIGEN DESTINO
+```{r}
 
-RECORRIDOS MAS REALIZADOS
+dataday <- dataday %>% 
+  mutate("Hora_origen" = hour(Fecha_origen),
+         "Hora_ori_rec" = case_when(Hora_origen >= 0 & Hora_origen < 6 ~ "Madrugada", 
+                               Hora_origen >= 6 & Hora_origen < 12 ~ "Mañana",
+                               Hora_origen >= 12 & Hora_origen< 18 ~ "Tarde",
+                               TRUE ~ "Noche" ),
+         "Hora_destino" = hour(Fecha_destino),
+         "Hora_des_rec" = case_when(Hora_destino >= 0 & Hora_destino < 6 ~ "Madrugada", 
+                               Hora_destino >= 6 & Hora_destino < 12 ~ "Mañana",
+                               Hora_destino >= 12 & Hora_destino< 18 ~ "Tarde",
+                               TRUE ~ "Noche" ))
 
-MAPA ORIGEN VERDE DESTINO ROJO POR RANGO HORARIO (ANIMADO)
 
-MAPA ORIGEN EN VERDE Y DESTINO EN ROJO POR DIA HABIL VS FINDE LLUVIA VS NO LLUVIA
+```
 
-PROMEDIO DE VIAJES DIARIOS POR MES
 
-VIAJES SEGÚN CLIMA
+```{r}
 
-RECREACIÓN VS MOVILIDAD LABORAL
+calles <- st_read("data/calles/callejero.shp",
+                         stringsAsFactors = TRUE,
+                         options = "ENCODING=UTF-8")
 
-###################### 
+barrios <- st_read("data/barrios/barrios.shp",
+                         stringsAsFactors = TRUE,
+                         options = "ENCODING=UTF-8")
 
-OFERTA:
+reco <- st_as_sf(dataday,coords = c("long_estacion_origen","lat_estacion_origen"),
+                 crs = st_crs(barrios))
 
-MAPA DE ESTACIONES INTERACTIVO CON CANTIDAD DE RECORRIDOS, ANCLAJES Y HORA PICO
+reco <- reco %>% 
+  select(!c(long_estacion_destino,lat_estacion_destino)) 
 
-DENSIDAD DE ESTACIONES POR BARRIO
 
-DISTANCIA CON UNIVERSIDADES Y PARQUES (INFO DE OSM O DESCARGA DE DATA ABIERTA)
+```
 
-ISOCRONAS DE ESTACIONES CON RESPECTO AL CENTRO
+```{r}
+
+dataday_filtro <-  dataday %>% 
+  filter(Hora_ori_rec == "Mañana" & Hora_des_rec == "Mañana") %>% 
+  head(1000)
+  
+
+ggplot()+
+  geom_sf(data = barrios)+
+  geom_point(data = dataday_filtro, aes(x = long_estacion_destino,
+                              y = lat_estacion_destino), color = "red")+
+  geom_point(data = dataday_filtro, aes(x = long_estacion_origen,
+                              y = lat_estacion_origen), color = "green", alpha = 0.2)
+
+  #geom_sf(data = calles, aes(color = bicisenda))
+```
+
+
