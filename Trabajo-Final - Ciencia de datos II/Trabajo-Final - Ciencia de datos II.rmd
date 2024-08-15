@@ -440,19 +440,36 @@ reco <- reco %>%
 
 ```{r}
 
-dataday_filtro <-  dataday %>% 
+dataday_filtro_ori <-  dataday %>% 
   filter(Hora_ori_rec == "Mañana" & Hora_des_rec == "Mañana") %>% 
-  head(1000)
+  group_by(long_estacion_origen,lat_estacion_origen) %>% 
+  summarise(total = n())
+
+dataday_filtro_des <-  dataday %>% 
+  filter(Hora_ori_rec == "Mañana" & Hora_des_rec == "Mañana") %>% 
+  group_by(long_estacion_destino,lat_estacion_destino) %>% 
+  summarise(total = n())
   
+
+
+
 
 ggplot()+
   geom_sf(data = barrios)+
-  geom_point(data = dataday_filtro, aes(x = long_estacion_destino,
-                              y = lat_estacion_destino), color = "red")+
-  geom_point(data = dataday_filtro, aes(x = long_estacion_origen,
-                              y = lat_estacion_origen), color = "green", alpha = 0.2)
+    stat_density2d(data = dataday_filtro_ori, 
+               aes(x = long_estacion_origen, y = lat_estacion_origen, fill = after_stat(level)), geom = "polygon", alpha=0.75)+
+  scale_fill_viridis_c(direction=-1)
 
-  #geom_sf(data = calles, aes(color = bicisenda))
+
+
 ```
 
+```{r}
+
+ggplot()+
+  geom_sf(data = barrios)+
+  stat_density2d(data = dataday_filtro_des, 
+               aes(x = long_estacion_destino, y = lat_estacion_destino, fill = after_stat(level)), geom = "polygon", alpha=0.75)+
+  scale_fill_viridis_c(direction=-1)
+```
 
