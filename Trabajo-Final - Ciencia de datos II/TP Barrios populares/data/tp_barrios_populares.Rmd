@@ -1,0 +1,308 @@
+---
+title: "Explorando Barrios Populares"
+subtitle: "Aplicaciones de software estadístico I - UNTREF"
+author: "Joaquín Lovizio Ramos"
+date: "`r Sys.Date()`"
+lang: "es"
+output:
+  rmdformats::downcute:
+    lightbox: TRUE
+    highlight: tango
+    toc: 3
+    number-sections: TRUE
+    code-folding: show #oculta el codigo
+    code_download: TRUE # para descargar el rmd
+# output:
+#   html_document:
+#     theme: "cosmo"
+#     toc: TRUE
+#     toc_float: TRUE #arma menu flotante
+#     number-sections: TRUE
+#     code-folding: show #oculta el codigo
+#     code_download: TRUE # para descargar el rmd
+---
+
+```{r setup, include=FALSE}
+#seteo la config gral del rmd 
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+options(scipen = 999)
+```
+
+# Introducción:
+
+
+Este documento se enmarca dentro del Trabajo Práctico Intetgrador de la materia Aplicaciones de software estadístico I de la [Maestría en Generación y Análisis de Información Estadística](https://untref.edu.ar/sitios/mgaie/) de la [Universidad Nacional de Tres de Febrero](http://untref.edu.ar/). El objetivo del mismo es realizar un análisis exploratorio sobre la composición de los barrios populares en Argentina. Se define como barrio popular aquel donde viven al menos 8 familias agrupadas o contiguas, donde más de la mitad de la población no cuente con título de propiedad del suelo ni acceso regular a dos o más de los servicios básicos –agua corriente, electricidad con medidor domiciliario y/o red cloacal. El decreto 358/17 crea el RENABAP, primer registro nacional de barrios populares y el CERTIFICADO DE VIVIENDA FAMILIAR, principal instrumento para la regularización de la cuestión dominial en los barrios populares. Este registro puede encontrarse en el [portal de datos abiertos del gobierno nacional](https://datos.gob.ar/dataset/desarrollo-social-registro-nacional-barrios-populares). 
+
+## Cargo librerías
+
+```{r}
+library(tidyverse)
+library(tidytext)
+library(lubridate)
+library(skimr)
+library(sf)
+library(leaflet)
+```
+
+## Levanto data y exploro
+
+```{r}
+
+barrios_populares<-read.csv("./data/2022-07-13_info_publica.csv", encoding = "UTF-8")
+
+#veamos la composición del dataframe
+glimpse(barrios_populares)
+
+#podemos usar la funcion skim() del paquete skimr para "resumir" la info de las variables en un nuevo dataframe 
+explore<-skim(barrios_populares)
+
+#podemos ver los valores únicos de una variable con la función unique()
+unique(barrios_populares$agua_corriente)
+
+barrios_populares<-barrios_populares%>%
+    filter(!is.na(cantidad_familias_aproximada))
+
+```
+
+# Desarrollo
+
+
+## Porcentajes
+Podemos calcular las frecuencias absolutas de una variable con la función `table()`:
+
+```{r}
+table(barrios_populares$agua_corriente)
+```
+
+Podemos calcular las frecuencias relativas de una variable agregando la función `prop.table()`:
+```{r}
+frecuencia_agua<-as.data.frame(round(prop.table(table(barrios_populares$agua_corriente))*100,digits = 2))%>%
+  arrange(desc(Freq))
+frecuencia_agua
+```
+
+
+## Medidas de tendencia central
+
+Veamos el promedio de familias por barrio popular:
+```{r, message=TRUE}
+mean(barrios_populares$cantidad_familias_aproximada)
+```
+
+Calculemos la mediana de la variable familias de los barrios populares:
+```{r, message=TRUE}
+median(barrios_populares$cantidad_familias_aproximada)
+```
+
+
+Veamos la cantidad de familias que más se repite en los barrios populares, es decir, la moda de la variable cantidad de familias:
+```{r, message=TRUE}
+moda_familias<-barrios_populares%>%
+  count(cantidad_familias_aproximada)%>%
+  slice_max(order_by = n)
+moda_familias
+```
+
+Finalmente calculemos el total de familias que viven en barrios populares:
+```{r, message=TRUE}
+sum(barrios_populares$cantidad_familias_aproximada)
+```
+
+
+## Medidas de posición
+
+Con la función `summary()` podemos ver los quartiles de una variable numérica:
+
+```{r}
+summary(barrios_populares$cantidad_familias_aproximada)
+```
+Con la función `quantile()` podemos ver quartiles, quintiles o percenetiles ajustando el argumento `probs = `:
+```{r}
+quantile(barrios_populares$cantidad_familias_aproximada, probs = c(0.25, 0.75))
+
+quantile(barrios_populares$cantidad_familias_aproximada, probs = c(0.1, 0.9))
+
+```
+
+
+## Medidas de dispersion
+
+La función `range()` nos indica el rango de una variable numérica, es decir, los valores mínimos y máximos que una variable tiene: 
+
+```{r}
+range(barrios_populares$cantidad_familias_aproximada)
+```
+La función `var()` nos indica la varianza de una variable:
+```{r}
+var(barrios_populares$cantidad_familias_aproximada)
+```
+La función `sd()` nos muestra el desvío estándar de una variable:
+```{r}
+sd(barrios_populares$cantidad_familias_aproximada)
+```
+
+## Al barro
+
+Veamos la evolución de barrios populares a través de las décadas, es decir la frecuencia acumulada
+
+```{r}
+evolucion_barrios_populares<-barrios_populares%>%
+  mutate(decada_de_creacion = str_replace_all(decada_de_creacion, "Década", ""),
+         decada_de_creacion = ymd(decada_de_creacion, truncated = 2L))%>%
+  group_by(decada_de_creacion)%>%
+  summarise(cantidad = n())%>%
+  mutate(acumulada=cumsum(cantidad))
+
+plot_1_evolucion<-ggplot(evolucion_barrios_populares, 
+                         aes(decada_de_creacion, acumulada))+
+  geom_line(size = 1, color = "salmon")+
+  scale_x_date(date_breaks = "10 years", date_labels = "%Y")+
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), 
+        legend.position = "none")+
+  labs(title = "Crecimiento de barrios populares", 
+       caption = "Fuente: portal de datos abiertos del gobierno nacional",
+       y = "",
+       x = "Año de creación")
+plot_1_evolucion
+```
+
+Veamos la distribucion del empleo para los habitantes de barrios populares de una selección de provincias.
+
+```{r}
+#creamos un objeto para trabajar la ocupacion
+ocupacion_barrios_populares<-barrios_populares%>%
+  pivot_longer(cols = 51:58,names_to = "situacion_laboral", values_to = "cantidad")%>%
+  select(id_renabap, nombre_barrio, provincia, departamento, localidad, situacion_laboral, cantidad)
+
+#chequeamos las categorías de la variable
+unique(ocupacion_barrios_populares$situacion_laboral)
+
+#limpiamos un poco
+ocupacion_barrios_populares<-ocupacion_barrios_populares%>%
+  mutate(situacion_laboral = str_replace_all(situacion_laboral, "situacion_laboral_", ""),
+         situacion_laboral = str_replace_all(situacion_laboral, "_", " "),
+         situacion_laboral = str_to_title(situacion_laboral))
+
+#rechequeamos
+unique(ocupacion_barrios_populares$situacion_laboral)
+
+#calculamos porcentajes
+ocupacion_barrios_populares_2<-ocupacion_barrios_populares%>%
+  group_by(provincia, situacion_laboral)%>%
+  summarise(cantidad = sum(cantidad))%>%
+  mutate(porcentaje = round(cantidad/sum(cantidad), digits = 2))
+  
+#ploteamos
+plot_2_ocupacion<-ggplot(ocupacion_barrios_populares_2%>%
+                          filter(provincia %in% c("Buenos Aires", "Córdoba", "Jujuy", "Mendoza")),
+                        aes(provincia, cantidad, fill = situacion_laboral))+
+  geom_bar(stat="identity", position = "fill")+
+  theme_minimal()+
+  scale_fill_brewer(palette = "Dark2")+
+   labs(title = "Distribución de situación laboral",
+       caption = "Fuente: portal de datos abiertos del gobierno nacional", 
+       x="",
+       y="", 
+       fill="Situación Laboral")
+plot_2_ocupacion
+
+```
+
+Si bien el gráfico nos muestra los porcentajes de cada categoría dentro de la variable situacion_laboral, se hace difícil comparar la misma entre difrentes provincias. Probemos filtrando estas categorías y visualizando de otra forma:
+
+```{r}
+plot_2_ocupacion<-ggplot(ocupacion_barrios_populares_2%>%
+                           filter(provincia %in% c("Buenos Aires", "Córdoba", "Jujuy", "Mendoza")),
+                        aes(reorder_within(provincia, porcentaje, situacion_laboral),
+                            porcentaje,
+                            fill = situacion_laboral))+
+  geom_bar(stat="identity", position = "dodge")+
+  scale_fill_brewer(palette = "Dark2")+
+  facet_wrap(~provincia, scales = "free_x")+
+  scale_x_reordered()+
+  scale_y_continuous(labels = scales::percent)+
+  theme_minimal()+
+  theme(axis.text.x = element_blank())+
+  labs(title = "Distribución de situación laboral",
+       caption = "Fuente: portal de datos abiertos del gobierno nacional", 
+       x="",
+       y="", 
+       fill="Situación Laboral")
+plot_2_ocupacion
+```
+Mucho mejor!
+
+
+Habiendo visto las principales distribuciones de frecuencias de la variable cantidad de familias (aunque podríamos haber reemplazado por otras), ahora tratemos de jugar un poco relacionando variables. 
+Veamos la densidad poblacional de familias en los barrios populares por provincia, es decir la media de familias por km2
+
+```{r}
+densidad_poblacional <- barrios_populares%>%
+  group_by(provincia)%>%
+  summarise(densidad = sum(cantidad_familias_aproximada)/sum(superficie_m2 / 10000))
+
+plot_2_densidad<-ggplot(densidad_poblacional, 
+                        aes(reorder(provincia, densidad), densidad, fill = densidad))+
+  geom_bar(stat = "identity")+
+  theme_minimal()+
+  theme(legend.position = "none")+
+  scale_y_log10()+
+  scale_fill_distiller(palette = "Reds", direction = 1)+
+  coord_flip()+
+  labs(title = "Densidad poblacional en barrios populares",
+       caption = "Fuente: portal de datos abiertos del gobierno nacional",
+       x= "",
+       y= "Cantidad de personas por hm2")
+plot_2_densidad
+```
+
+Podemos observar que la Ciudad de Buenos Aires es el distrito con mayor densidad poblacional en barrios populares. Veamos dónde se ubican estos barrios y cómo se distribuye la densidad poblacional por cuadra (hm2)
+
+
+```{r, message=TRUE}
+
+#cargamos data de barrios y comunas de CABA
+df_barrios <- st_read("https://cdn.buenosaires.gob.ar/datosabiertos/datasets/ministerio-de-educacion/barrios/barrios.geojson")%>%st_transform(crs = 4326)
+
+#creamos un objeto de tipo sf y joineamos ambos objetos
+barrios_populares_caba_sf<-st_as_sf(barrios_populares, wkt = "geometry", crs = 4326)%>%
+  filter(provincia == "Ciudad Autónoma de Buenos Aires")%>%
+  group_by(nombre_barrio)%>%
+  summarise(densidad_hm2 = sum(cantidad_familias_aproximada)/sum(superficie_m2 / 10000))%>%
+  st_join(df_barrios)
+
+#calculamos la cantidad de intervalos óptima para agrupar los valores de la densidad
+cantidad_intervalos<-(max(barrios_populares_caba_sf$densidad_hm2)-min(barrios_populares_caba_sf$densidad_hm2))/16/5
+
+#creamos una paleta con la cantidad de intervalos que calculamos
+pal <- colorBin("YlOrRd", domain = barrios_populares_caba_sf$densidad_hm2, bins = 8)
+
+#creamos una leyenda para el mapa
+etiqueta <- paste(
+  "Barrio: ", barrios_populares_caba_sf$nombre_barrio,"<br/>", 
+  "Densidad por h2: ", round(barrios_populares_caba_sf$densidad_hm2, digits = 0), "<br/>", 
+  "Comuna: ", barrios_populares_caba_sf$COMUNA, 
+  sep="") %>%
+  lapply(htmltools::HTML)
+
+#creamos el mapa
+mapa_bp_caba<-leaflet(data = barrios_populares_caba_sf)%>%
+  addProviderTiles("CartoDB.Positron")%>%
+  addPolygons(fillColor = ~pal(densidad_hm2),
+              fillOpacity = 0.8,
+              color= "white",
+              label = etiqueta)%>%
+  # addMarkers()%>%
+  addLegend(pal = pal, values = ~densidad_hm2, opacity = 0.7, title = NULL,
+            position = "bottomright")%>%
+  setView(lng= -58.44572071865652, lat=-34.60758005005588, zoom = 12)
+mapa_bp_caba
+  
+```
+
+
+# Conclusiones
+
+En el presente documento fue posible recorrer las funciones básicas para realizar un análisis exploratorio en el lenguaje R. Como resultados principales del análisis, se puede decir que la mayoría de los barrios populares tienen una **Conexión irregular a la red de agua**, ya que más de la mitad de los mismos poseen este tipo de conexión mientras que la otra mitad se distribuye entre 9 tipos de conexiones diferentes. Además, el **promedio de familias** que viven en los barrios populares es de 205 familias por barrio y el **total de familias** viviendo en estos barrios es de casi 1.2M. Por otro lado, se observa que **a partir de la década de 1970** hay un salto exponencial en el surgimiento de barrios, duplicándose la cantidad existente, década tras década. En cuanto a la **situación laboral**, en las provincia de Buenos Aires y Jujuy prima la categoría *"No trabaja"*, en la provincia de Córdoba la categoría *"Empleado en Negro"* y en Mendoza prima *"Realiza Trabajos del Hogar Sin Sueldo"*. Finalmente, el distrito donde mayor **densidad poblacional** existe dentro de los barrios populares es en la Ciudad de Buenos Aires, que contabiliza en promedio **254 familias por manzana** (cuadra). El barrio con mayor densidad en la Ciudad de Buenos Aires es **Los Pinos**, ubicado en la Comuna 8, en el barrio de Villa Soldati, que cuenta con 682 familias por cuadra.
+ 

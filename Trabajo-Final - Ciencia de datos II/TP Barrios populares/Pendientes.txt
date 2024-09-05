@@ -1,0 +1,57 @@
+https://rpubs.com/JoaquinLovizio/1060139
+
+https://rpubs.com/ilordenato/renabap
+
+https://rpubs.com/inespatop/transporte_caba_barrios_pop
+
+https://rpubs.com/paulavidela/preprocesamientos
+
+https://rpubs.com/andres-ab/leaflet-showcase
+
+# Graficos
+
+1) BP por zona de amba ( o bar race o absoluto) (abs y porcentual) (40%)
+
+2) Evolutivo de BP por clasificación (villa / asentamiento)
+
+https://www.appsilon.com/post/r-highcharts
+
+3) Arreglar grafico evolutivo cumsum suma solo resto pais (100%)
+
+
+# Mapas
+
+1) leaflet descriptivo con popup (nombre, cant de familias, decada de creación, densidad) (80%)
+
+https://r-graph-gallery.com/242-use-leaflet-control-widget.html
+
+
+2) ggplot descriptivo con barrios por zonas (90%)
+
+3) BP por densidad (familias por mt2)
+4) BP por densidad (viviendas por mt2)
+
+# OSM
+
+https://conservancy.umn.edu/server/api/core/bitstreams/ba6ea265-c865-48d2-bcf4-e287542efd9a/content#the-necessary-libraries
+
+a) Paradas de colectivos
+b) ver trenes y estaciones
+c) hospitales (100%)
+d) escuelas
+
+# Mapas distancias
+https://rpubs.com/angiescetta/MODULO2_CLASE5
+https://elradar.github.io/2019/10/25/obteniendo-rutas-tiempo-y-distancia-de-viajes-con-open-source-routing-machine/
+Villa Tranquila
+
+1) Distancias a Hospitales
+2) Ruteos a Hospitales
+
+
+  html_notebook:
+    depth: 4
+    toc: yes
+    toc_float: yes
+
+
